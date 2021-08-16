@@ -1509,7 +1509,7 @@ impl<T, A: Allocator> Vec<T, A> {
                 // SAFETY: We never touch this element again after dropped.
                 unsafe { ptr::drop_in_place(cur) };
                 // We already advanced the counter.
-                break;
+                continue;
             }
 
             // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
