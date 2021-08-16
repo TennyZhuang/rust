@@ -1495,16 +1495,30 @@ impl<T, A: Allocator> Vec<T, A> {
                 // SAFETY: We never touch this element again after dropped.
                 unsafe { ptr::drop_in_place(cur) };
                 // We already advanced the counter.
-                continue;
+                break;
             }
-            if g.deleted_cnt > 0 {
-                // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
-                // We use copy for move, and never touch this element again.
-                unsafe {
-                    let hole_slot = g.v.as_mut_ptr().add(g.processed_len - g.deleted_cnt);
-                    ptr::copy_nonoverlapping(cur, hole_slot, 1);
-                }
+            g.processed_len += 1;
+        }
+
+        while g.processed_len < original_len {
+            let cur = unsafe { &mut *g.v.as_mut_ptr().add(g.processed_len) };
+            if !f(cur) {
+                // Advance early to avoid double drop if `drop_in_place` panicked.
+                g.processed_len += 1;
+                g.deleted_cnt += 1;
+                // SAFETY: We never touch this element again after dropped.
+                unsafe { ptr::drop_in_place(cur) };
+                // We already advanced the counter.
+                break;
             }
+
+            // SAFETY: `deleted_cnt` > 0, so the hole slot must not overlap with current element.
+            // We use copy for move, and never touch this element again.
+            unsafe {
+                let hole_slot = g.v.as_mut_ptr().add(g.processed_len - g.deleted_cnt);
+                ptr::copy_nonoverlapping(cur, hole_slot, 1);
+            }
+
             g.processed_len += 1;
         }
 
